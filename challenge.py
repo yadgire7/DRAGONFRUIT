@@ -1,7 +1,9 @@
 import random
 from pyspark import SparkContext, SparkConf
 
-
+# environment variables
+os.environ['PYSPARK_PYTHON'] = sys.executable
+os.environ['PYSPARK_DRIVER_PYTHON'] = sys.executable
 
 '''
 - Each image is 100,000*100,000 pixels and is BLACK and WHITE (black:part of organism, whtie:surrounding)
@@ -20,17 +22,25 @@ from pyspark import SparkContext, SparkConf
 
 # Considering we have 1000 images to be processed
 
-# function to generate 1000 images
-def generate_images(num_images):
-    images = []
-    for i in range(num_images):
+# function to generate image
+def generate_image():
+    image = []
+    for i in range(1000):
         row = [random.choice([0,1]) for i in range(100000)]
-        col = [random.choice([0,1]) for i in range(100000)]
-        image = merge(row,col)
-        images.append(image)
+        image.append(row)
+    return image
+
+# function to generate n images
+def generate_images(n):
+    images = []
+    for i in range(n):
+        images.append(generate_image())
     return images
 
-# function to represent black and white image as a sparse matrix
+
+
+
+
 
 
 
