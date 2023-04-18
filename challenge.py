@@ -1,3 +1,5 @@
+import sys
+import os
 import random
 from pyspark import SparkContext, SparkConf
 
@@ -13,29 +15,64 @@ os.environ['PYSPARK_DRIVER_PYTHON'] = sys.executable
 - Instead, we can use the information that only 25% of the image is black and the rest is white,
     and store the location of the black pixels only using the concept of sparse matrix
 - Thus now, the total memory required is 100,000*100,000*0.25*8 = 2,000,000,000 bytes = 2 GB
-- On an average, it wpuld take 30 GB of memory to store a 100,000*100,000 image (Google)
+- On an average, it would take 30 GB of memory to store a 100,000*100,000 image (Google)
 - So, this method will save 28 GB of memory per image
 - This is the approach for task 1 part a. representing the black and white image
 
+Time complexity:
+- As the black portion(1s) is contiguous, we can assume that organism is contained in a square boundary,
+  which occupies 25% of the image
+- When we traverse the matrix and get our first black pixel, we can assume it as the first coordinate of the square boundary(r,c)
+  and thus calculate the other 3 corners of the square boundary as (r, c+x), (r+x, c) and (r+x, c+x)
+  such that x is the length of the square boundary
+  implies x^2 = 25% of the image = 25*10^8 pixels
+  implies x = 5*10^4 pixels
+- Thus, the time required to store the actual image is the time required to traverse the matrix and get the first black pixel
+
+Definitely, this approach is meant to give the best results in terms of memory and time complexity
+at the cost of accuracy
 '''
 # As the size of the dataset is huge to fit into the main memory, I am using pyspark to process the data 
 
 # Considering we have 1000 images to be processed
 
 # function to generate image
+'''
 def generate_image():
     image = []
     for i in range(1000):
         row = [random.choice([0,1]) for i in range(100000)]
         image.append(row)
     return image
+'''
 
+'''
 # function to generate n images
 def generate_images(n):
     images = []
     for i in range(n):
         images.append(generate_image())
     return images
+'''
+
+# function to store the image in a sparse matrix
+'''
+def store_image(img):
+    sparse_img = []
+    for i in range(len(img)):
+        for j in range(len(img[i])):
+            if img[i][j] == 1:
+                sparse_img.append((i, j))
+    return sparse_img
+'''
+
+data  = generate_images(2)
+rdd = sc.parallelize(data)
+
+img_details = rdd.map(lambda img: store_image(img)).first()
+print(img_details)
+
+
 
 
 
