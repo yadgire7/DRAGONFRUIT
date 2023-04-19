@@ -32,28 +32,37 @@ Time complexity:
 Definitely, this approach is meant to give the best results in terms of memory and time complexity
 at the cost of accuracy
 '''
-# As the size of the dataset is huge to fit into the main memory, I am using pyspark to process the data 
-
-# Considering we have 1000 images to be processed
+# As the size of the dataset is huge to fit into the main memory, we can use spark (pyspark) to process the data parallely with many compute nodes
 
 # function to generate image
-'''
-def generate_image():
+def generate_fake_image():
     image = []
-    for i in range(1000):
+    for r in range(1000):
+        # generate a random row
         row = [random.choice([0,1]) for i in range(100000)]
-        image.append(row)
+        # search for a black pixel in the row
+        if 1 in row:
+            r,c = r, row.index(1) # get the first black pixel
+            zero_row = [0]*100000
+            x = 50000
+            #check if r + x and c + x are within the boundary
+            if r + x > 100000:
+                x = 100000 - r
+            if c + x > 100000:
+                x = 100000 - c
+            # fill the square boundary with 1s
+            for i in range(r, r+x):
+                for j in range(c, c+x):
+                    zero_row[j] = 1
+                image.append(zero_row)
+            # fill the remaining rows randomly
+            for i in range(r+x, 100000):
+                image.append([random.choice([0,1]) for i in range(100000)])
+        else:
+            image.append(row)
     return image
-'''
 
-'''
-# function to generate n images
-def generate_images(n):
-    images = []
-    for i in range(n):
-        images.append(generate_image())
-    return images
-'''
+
 
 # function to store the image in a sparse matrix
 '''
@@ -69,7 +78,7 @@ def store_image(img):
 data  = generate_images(2)
 rdd = sc.parallelize(data)
 
-img_details = rdd.map(lambda img: store_image(img)).first()
+img_details = rdd.map(lambda img: store_image(img))
 print(img_details)
 
 
