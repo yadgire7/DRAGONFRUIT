@@ -1,94 +1,147 @@
+'''
+Author: Saurabh Arun Yadgire
+GitHub: yadgire7
+'''
 import sys
 import os
 import random
+import math
 from pyspark import SparkContext, SparkConf
-
+import timeit
 # environment variables
 os.environ['PYSPARK_PYTHON'] = sys.executable
 os.environ['PYSPARK_DRIVER_PYTHON'] = sys.executable
 
+
+#################################################
+# child functions for dye_image
 '''
-- Each image is 100,000*100,000 pixels and is BLACK and WHITE (black:part of organism, whtie:surrounding)
-- Considering the image to be a matrix of dimensions 100,000*100,000; with each pixel being a 0(white) or 1(black)(an interger)
-  each location takes 4*3 = 12 bytes of memory (4 bytes each for row, column and value)
-- Thus, the total memory required is 100,000*100,000*12 = 12,000,000,000 bytes = 12 GB
-- Instead, we can use the information that only 25% of the image is black and the rest is white,
-    and store the location of the black pixels only using the concept of sparse matrix
-- Thus now, the total memory required is 100,000*100,000*0.25*8 = 2,000,000,000 bytes = 2 GB
-- On an average, it would take 30 GB of memory to store a 100,000*100,000 image (Google)
-- So, this method will save 28 GB of memory per image
-- This is the approach for task 1 part a. representing the black and white image
-
-Time complexity:
-- As the black portion(1s) is contiguous, we can assume that organism is contained in a square boundary,
-  which occupies 25% of the image
-- When we traverse the matrix and get our first black pixel, we can assume it as the first coordinate of the square boundary(r,c)
-  and thus calculate the other 3 corners of the square boundary as (r, c+x), (r+x, c) and (r+x, c+x)
-  such that x is the length of the square boundary
-  implies x^2 = 25% of the image = 25*10^8 pixels
-  implies x = 5*10^4 pixels
-- Thus, the time required to store the actual image is the time required to traverse the matrix and get the first black pixel
-
-Definitely, this approach is meant to give the best results in terms of memory and time complexity
-at the cost of accuracy
+function to get the 8 neighbors of a pixel/ cell
 '''
-# As the size of the dataset is huge to fit into the main memory, we can use spark (pyspark) to process the data parallely with many compute nodes
+#################################################
 
-# function to generate image
-def generate_fake_image():
+def get_neighbors(image, row, col):
+    neighbors = []
+    for i in range(row-1, row+2):
+        for j in range(col-1, col+2):
+            if i >= 0 and i < len(image) and j >= 0 and j < len(image[0]):
+                neighbors.append((i, j))
+    neighbors.remove((row, col))
+    return neighbors
+
+
+###############################################
+'''
+Randomly choose whether to dye the pixel or not
+i.e whether the cell is cancer-causing or not
+if chosen to dye:
+    select a random number of neighbors to die         
+'''
+################################################
+
+
+def generate_dye_image(dye_image, r, c, x):
+    for i in range(r, r+x):
+        for j in range(c, c+x):
+            choose = random.choice([True, False])
+            if choose == True:
+                neighbors = get_neighbors(dye_image, r, c)
+                k = random.randint(0, len(neighbors))
+                sample = random.sample(neighbors, k)
+                for pos in sample:
+                    dye_image[pos[0]][pos[1]] = 1
+                dye_image[i][j] = 1
+    return dye_image
+
+
+#########################################################################
+'''
+generate microscopic image(black and white) and dyed image simultaneously
+1. choose the area covered by parasite randomly between (0.25,0.70)
+2. fill a square region(assumption explained in readme)
+that covers above chosen area of the image
+3. dye the image using above functions to dye the image
+4. get both images simulataneously
+'''
+#########################################################################
+
+
+def generate_fake_image(size):
     image = []
-    for r in range(1000):
+    dye_image = [[0]*size for i in range(size)]
+    pick = round(random.uniform(0.25, 0.70), 2)
+    x = int(math.sqrt(int(pick*(size**2))))
+    for r in range(size):
         # generate a random row
-        row = [random.choice([0,1]) for i in range(100000)]
+        row = [random.choice([0, 1]) for i in range(size)]
         # search for a black pixel in the row
         if 1 in row:
-            r,c = r, row.index(1) # get the first black pixel
-            zero_row = [0]*100000
-            x = 50000
-            #check if r + x and c + x are within the boundary
-            if r + x > 100000:
-                x = 100000 - r
-            if c + x > 100000:
-                x = 100000 - c
+            r, c = r, row.index(1)  # get the first black pixel
+            zero_row = [0]*size
+            # check if r + x and c + x are within the boundary
+            if r + x > size:
+                x = size - r
+            if c + x > size:
+                x = size - c
             # fill the square boundary with 1s
             for i in range(r, r+x):
                 for j in range(c, c+x):
                     zero_row[j] = 1
             for i in range(r, r+x):
-              image.append(zero_row)
-            # fill the remaining rows randomly
-            for i in range(r+x, 100000):
-                image.append([0]*100000)
+                image.append(zero_row)
+            # generate dye_image simultaneously
+            dye_image = generate_dye_image(dye_image, r, c, x)
+            # fill the remaining rows with 0s
+            for i in range(r+x, size):
+                image.append([0]*size)
             break
         else:
             image.append(row)
-    return image
+    return image, dye_image
 
 
-
-# function to store the image in a sparse matrix
+####################################################################
 '''
-def store_image(img):
-    sparse_img = []
-    for i in range(len(img)):
-        for j in range(len(img[i])):
-            if img[i][j] == 1:
-                sparse_img.append((i, j))
-    return sparse_img
+function to decide whether parasite is infected with cancer or not
+function to calulate area covered
+Solution to task 4:
+Use pyspark to computer results parallely and improve the processing speed
 '''
-
-data  = generate_images(2)
-rdd = sc.parallelize(data)
-
-img_details = rdd.map(lambda img: store_image(img))
-print(img_details)
+####################################################################
 
 
+def solution(image_rdd, dye_rdd):
+    area_image = image_rdd.map(lambda row: (1, sum(row)))\
+        .reduceByKey(lambda a, b: a+b).map(lambda area: area[1]).first()
 
+    area_dye = dye_rdd.map(lambda row: (1, sum(row)))\
+        .reduceByKey(lambda a, b: a+b).map(lambda area: area[1]).first()
 
+    if area_dye/area_image >= 0.1:
+        return "Parasite is infected with cancer."
+    else:
+        return "Parasite is  NOT infected with cancer."
 
+####################################################################
 
+if __name__ == '__main__':
+    sc = SparkContext().getOrCreate()
+    # generate images
+    image, dye = generate_fake_image(100000)
 
+    # parallelize data
+    image_rdd = sc.parallelize(image)
+    dye_rdd = sc.parallelize(dye)
 
+    # calculate area using mapreduce
+    start = timeit.default_timer()
+    decision = solution(image_rdd, dye_rdd)
+    end = timeit.default_timer()
+    print(decision)
+    print(f"Time taken: {end-start} seconds\n")
 
-
+# results for size = 10000 on Google Colab
+'''
+Parasite is infected with cancer.
+Time taken: 10.40736301100003 seconds
+'''
