@@ -37,6 +37,6 @@ We will generate randomly as a matrix in the following manner:
 - if the bit is 1, means the pixel is black.
 - As soon as we get this first black pixel, we can assume it as the first coordinate of the square boundary(r,c) and thus calculate the other 3 corners of the square boundary as (r, c+x), (r+x, c) and (r+x, c+x) such that x is the length of the square boundary;
 implies x^2 = 30% of the image = 3*10^7 pixels 
-implies x = sqrt(3*10^7) ~ 5*10^3 pixels
-- fill the rest of the maxtrix randomly with 0s and 1s
+implies x = sqrt(3*10^9) ~ 5*10^4 pixels
+- fill the rest of the maxtrix with 0s
 (Thus, the time required to generate the image is the time required to get the first black pixel(1))

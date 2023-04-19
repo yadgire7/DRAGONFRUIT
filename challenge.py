@@ -54,10 +54,12 @@ def generate_fake_image():
             for i in range(r, r+x):
                 for j in range(c, c+x):
                     zero_row[j] = 1
-                image.append(zero_row)
+            for i in range(r, r+x):
+              image.append(zero_row)
             # fill the remaining rows randomly
             for i in range(r+x, 100000):
-                image.append([random.choice([0,1]) for i in range(100000)])
+                image.append([0]*100000)
+            break
         else:
             image.append(row)
     return image
